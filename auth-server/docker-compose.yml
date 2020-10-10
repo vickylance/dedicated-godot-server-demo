@@ -1,0 +1,10 @@
+version: '3.3'
+services:
+  server:
+    build: .
+    ports:
+      - '5000:8080'
+    volumes:
+      - db-data:/app
+volumes:
+  db-data:

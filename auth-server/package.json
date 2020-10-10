@@ -1,0 +1,80 @@
+{
+  "name": "auth-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npm run prod",
+    "build": "npm-run-all clean transpile copy:templates",
+    "server": "node ./dist/bin/www",
+    "dev": "NODE_ENV=development npm-run-all build server",
+    "prod": "NODE_ENV=production npm-run-all build server",
+    "transpile": "babel ./src --out-dir dist",
+    "copy:templates": "copyfiles -afE ./src/templates/**/*.njk ./dist/templates/",
+    "clean": "rimraf dist",
+    "watch:dev": "nodemon",
+    "test": "jest",
+    "format": "prettier --config prettier.config.js './src' --write",
+    "lint": "eslint --config .eslintrc.json './src' --fix"
+  },
+  "dependencies": {
+    "@babel/cli": "^7.10.4",
+    "@babel/core": "^7.10.4",
+    "@babel/preset-env": "^7.10.4",
+    "@gd-com/utils": "^4.1.0",
+    "@hapi/joi": "^17.1.1",
+    "bcrypt": "^5.0.0",
+    "cookie-parser": "~1.4.4",
+    "debug": "~2.6.9",
+    "dotenv": "^8.2.0",
+    "express": "~4.16.1",
+    "jsonwebtoken": "^8.5.1",
+    "morgan": "~1.9.1",
+    "nodemailer": "^6.4.10",
+    "nodemon": "^2.0.4",
+    "npm-run-all": "^4.1.5",
+    "nunjucks": "^3.2.1",
+    "rimraf": "^3.0.2",
+    "sequelize": "^6.3.5",
+    "sequelize-cli": "^6.2.0",
+    "sqlite3": "^5.0.0",
+    "uuid": "^8.2.0",
+    "ws": "^7.3.1"
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "10"
+          }
+        }
+      ]
+    ]
+  },
+  "nodemonConfig": {
+    "exec": "npm run dev",
+    "watch": [
+      "src/*",
+      "public/*"
+    ],
+    "ignore": [
+      "**/__tests__/**",
+      "*.test.js",
+      "*.spec.js"
+    ]
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "devDependencies": {
+    "copyfiles": "^2.4.0",
+    "eslint": "^7.4.0",
+    "eslint-config-airbnb-base": "^14.2.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-import": "^2.22.0",
+    "eslint-plugin-prettier": "^3.1.4",
+    "jest": "^26.1.0",
+    "prettier": "^2.0.5"
+  }
+}
