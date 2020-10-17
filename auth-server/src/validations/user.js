@@ -1,4 +1,5 @@
 import Joi from '@hapi/joi';
+import { getPasswordRegEx } from '../utils';
 
 const registerValidation = (data) => {
   const userValidation = Joi.object({
@@ -10,10 +11,8 @@ const registerValidation = (data) => {
       .required()
       .email({ minDomainSegments: 2 })
       .required(),
-    password: Joi.string()
-      .pattern(new RegExp('^[a-zA-Z0-9]{3,30}$'))
-      .required(),
-    repeat_password: Joi.ref('password'),
+    password: Joi.string().pattern(getPasswordRegEx()).required(),
+    confirm_password: Joi.ref('password'),
   });
   return userValidation.validate(data);
 };
@@ -38,4 +37,53 @@ const deleteValidation = (data) => {
   return userValidation.validate(data);
 };
 
-export { registerValidation, loginValidation, deleteValidation };
+const resetPasswordRequestValidation = (data) => {
+  const userValidation = Joi.object({
+    emailOrUsername: Joi.alternatives()
+      .try(
+        Joi.string().min(6).max(255).email({ minDomainSegments: 2 }),
+        Joi.string().alphanum().min(6).max(30)
+      )
+      .required(),
+  });
+  return userValidation.validate(data);
+};
+
+const resetPasswordValidation = (data) => {
+  const userValidation = Joi.object({
+    password: Joi.string().pattern(getPasswordRegEx()).required(),
+    confirm_password: Joi.ref('password'),
+  });
+  return userValidation.validate(data);
+};
+
+const changePasswordValidation = (data) => {
+  const userValidation = Joi.object({
+    old_password: Joi.string().pattern(getPasswordRegEx()).required(),
+    new_password: Joi.ref('old_password'),
+    confirm_password: Joi.ref('old_password'),
+  });
+  return userValidation.validate(data);
+};
+
+const resendEmailValidation = (data) => {
+  const userValidation = Joi.object({
+    emailOrUsername: Joi.alternatives()
+      .try(
+        Joi.string().min(6).max(255).email({ minDomainSegments: 2 }),
+        Joi.string().alphanum().min(6).max(30)
+      )
+      .required(),
+  });
+  return userValidation.validate(data);
+};
+
+export {
+  registerValidation,
+  loginValidation,
+  deleteValidation,
+  resetPasswordRequestValidation,
+  resetPasswordValidation,
+  changePasswordValidation,
+  resendEmailValidation,
+};

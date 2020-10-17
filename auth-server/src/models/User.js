@@ -3,6 +3,42 @@ import sequelize from '../db';
 
 class User extends Model {}
 
+/**
+ * @swagger
+ *  components:
+ *    schemas:
+ *      User:
+ *        type: object
+ *        required:
+ *          - name
+ *          - username
+ *          - email
+ *          - password
+ *          - confirmed
+ *        properties:
+ *          name:
+ *            type: string
+ *            description: Name of the user
+ *          username:
+ *            type: string
+ *            description: Username of the user, needs to be unique.
+ *          email:
+ *            type: string
+ *            format: email
+ *            description: Email for the user, needs to be unique.
+ *          password:
+ *            type: string
+ *            description: Hashed password for the user
+ *          confirmed:
+ *            type: boolean
+ *            description: Email confirmation status of the user
+ *        example:
+ *           name: Alexander
+ *           username: Alexus
+ *           email: fake@email.com
+ *           password: hashedPassword
+ *           confirmed: true
+ */
 User.init(
   {
     name: {
