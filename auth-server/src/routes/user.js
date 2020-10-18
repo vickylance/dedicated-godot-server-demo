@@ -105,7 +105,7 @@ const router = express.Router();
  */
 router.post(
   '/register',
-  (req, res, next) => rateLimiter(req, res, next, 1, 60 * 5), // can register a new user per ip for 1 time in 5 mins
+  rateLimiter(1, 60 * 5), // can register a new user per ip for 1 time in 5 mins
   async (req, res) => {
     // validate request body
     const { error } = registerValidation(req.body);
@@ -238,7 +238,7 @@ router.post(
  *              schema:
  *                msg: string
  */
-router.post('/login', async (req, res) => {
+router.post('/login', rateLimiter(10, 30), async (req, res) => {
   // validate request body
   const { error } = loginValidation(req.body);
   if (error) {
@@ -337,7 +337,7 @@ router.post('/login', async (req, res) => {
  *              example:
  *                token: invalid token
  */
-router.post('/token', (req, res) => {
+router.post('/token', rateLimiter(10, 30), (req, res) => {
   const refreshToken = req.body.token;
   if (refreshToken == null) return res.status(401).json({ msg: INVALID_TOKEN });
   if (!redisClient.get(refreshToken))
@@ -380,7 +380,7 @@ router.post('/token', (req, res) => {
  *              schema:
  *                msg: string
  */
-router.get('/confirmation/:token', async (req, res) => {
+router.get('/confirmation/:token', rateLimiter(1, 60), async (req, res) => {
   try {
     const { user } = jwt.verify(req.params.token, process.env.EMAIL_SECRET);
 
@@ -453,7 +453,7 @@ router.get('/confirmation/:token', async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.delete('/:id', verifyToken, async (req, res) => {
+router.delete('/:id', verifyToken, rateLimiter(1, 60 * 5), async (req, res) => {
   // validate request body
   const { error } = deleteValidation(req.body);
   if (error) {
@@ -500,7 +500,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.get('/logout', verifyToken, async (req, res) => {
+router.get('/logout', verifyToken, rateLimiter(10, 30), async (req, res) => {
   try {
     redisClient.del(req.user.id);
     return res.status(200).json({ msg: LOGGED_OUT });
@@ -557,37 +557,44 @@ router.get('/logout', verifyToken, async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.post('/password/change', verifyToken, async (req, res) => {
-  // validate request body
-  const { error } = changePasswordValidation(req.body);
-  if (error) {
-    return res.status(400).json({ msg: error.details[0].message });
-  }
-  if (req.body.new_password !== req.body.confirm_password) {
-    return res.status(400).json({ msg: NEW_PASSWORD_MISMATCH });
-  }
+router.post(
+  '/password/change',
+  verifyToken,
+  rateLimiter(1, 60 * 5),
+  async (req, res) => {
+    // validate request body
+    const { error } = changePasswordValidation(req.body);
+    if (error) {
+      return res.status(400).json({ msg: error.details[0].message });
+    }
+    if (req.body.new_password !== req.body.confirm_password) {
+      return res.status(400).json({ msg: NEW_PASSWORD_MISMATCH });
+    }
 
-  // Validate password
-  const user = await User.findOne({
-    where: { id: req.user.id },
-  });
-  const validPassword = await bcrypt.compare(
-    req.body.old_password,
-    user.password
-  );
-  if (!validPassword) {
-    return res.status(403).json({ msg: INVALID_PASSWORD });
-  }
+    // Validate password
+    const user = await User.findOne({
+      where: { id: req.user.id },
+    });
+    const validPassword = await bcrypt.compare(
+      req.body.old_password,
+      user.password
+    );
+    if (!validPassword) {
+      return res.status(403).json({ msg: INVALID_PASSWORD });
+    }
 
-  // Change the password for the user
-  try {
-    const userWithNewPassword = User.build({ password: req.body.new_password });
-    await userWithNewPassword.save({ where: { id: req.user.id } });
-    return res.status(200).json({ msg: 'OK', id: req.user.id });
-  } catch (err) {
-    return res.status(500).json({ msg: DELETE_FAILED });
+    // Change the password for the user
+    try {
+      const userWithNewPassword = User.build({
+        password: req.body.new_password,
+      });
+      await userWithNewPassword.save({ where: { id: req.user.id } });
+      return res.status(200).json({ msg: 'OK', id: req.user.id });
+    } catch (err) {
+      return res.status(500).json({ msg: DELETE_FAILED });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -630,7 +637,7 @@ router.post('/password/change', verifyToken, async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.get('/password/reset', async (req, res) => {
+router.get('/password/reset', rateLimiter(1, 60 * 5), async (req, res) => {
   // TODO: implement rate limiting
 
   // validate request body
@@ -723,34 +730,38 @@ router.get('/password/reset', async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.patch('/password/reset/:token', async (req, res) => {
-  try {
-    // TODO: check for last 5 passwords
+router.patch(
+  '/password/reset/:token',
+  rateLimiter(1, 60 * 5),
+  async (req, res) => {
+    try {
+      // TODO: check for last 5 passwords
 
-    const { user } = jwt.verify(req.params.token, process.env.EMAIL_SECRET);
+      const { user } = jwt.verify(req.params.token, process.env.EMAIL_SECRET);
 
-    // validate request body
-    const { error } = resetPasswordValidation(req.body);
-    if (error) {
-      return res.status(400).json({ msg: error.details[0].message });
+      // validate request body
+      const { error } = resetPasswordValidation(req.body);
+      if (error) {
+        return res.status(400).json({ msg: error.details[0].message });
+      }
+
+      // Check if the user exists
+      const savedUser = await User.findOne({
+        where: { id: user.id },
+      });
+      if (!savedUser) {
+        return res.status(404).json({ msg: USER_NOT_EXISTS });
+      }
+
+      // change the password
+      const userWithNewPassword = User.build({ password: req.body.password });
+      await userWithNewPassword.save({ where: { id: savedUser.id } });
+      return res.status(200).json({ id: savedUser.id });
+    } catch (err) {
+      return res.status(500).json({ msg: err });
     }
-
-    // Check if the user exists
-    const savedUser = await User.findOne({
-      where: { id: user.id },
-    });
-    if (!savedUser) {
-      return res.status(404).json({ msg: USER_NOT_EXISTS });
-    }
-
-    // change the password
-    const userWithNewPassword = User.build({ password: req.body.password });
-    await userWithNewPassword.save({ where: { id: savedUser.id } });
-    return res.status(200).json({ id: savedUser.id });
-  } catch (err) {
-    return res.status(500).json({ msg: err });
   }
-});
+);
 
 /**
  * @swagger
@@ -791,51 +802,47 @@ router.patch('/password/reset/:token', async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.post(
-  '/resend-email',
-  (req, res, next) => rateLimiter(req, res, next, 1, 60),
-  async (req, res) => {
-    // validate request body
-    const { error } = resendEmailValidation(req.body);
-    if (error) {
-      return res.status(400).json({ msg: error.details[0].message });
-    }
-
-    // check if valid user
-    let user = false;
-    user = await User.findOne({
-      where: { email: req.body.emailOrUsername },
-    });
-    if (!user) {
-      user = await User.findOne({
-        where: { username: req.body.emailOrUsername },
-      });
-    }
-    if (!user) {
-      return res.status(404).json({ msg: USER_NOT_EXISTS });
-    }
-
-    try {
-      const emailToken = jwt.sign({ user: user.id }, process.env.EMAIL_SECRET, {
-        expiresIn: '1d',
-      });
-
-      const url = getUserConfirmationUrl(emailToken);
-      const template = fs.readFileSync(
-        path.resolve(__dirname, '../templates/confirmEmail.njk'),
-        'utf-8'
-      );
-      transporter.sendMail({
-        to: user.email,
-        subject: 'Confirm email',
-        html: nunjucks.renderString(template, { url }),
-      });
-
-      return res.status(201).json({ msg: EMAIL_SENT });
-    } catch (err) {
-      return res.status(500).json({ msg: err });
-    }
+router.post('/resend-email', rateLimiter(1, 60), async (req, res) => {
+  // validate request body
+  const { error } = resendEmailValidation(req.body);
+  if (error) {
+    return res.status(400).json({ msg: error.details[0].message });
   }
-);
+
+  // check if valid user
+  let user = false;
+  user = await User.findOne({
+    where: { email: req.body.emailOrUsername },
+  });
+  if (!user) {
+    user = await User.findOne({
+      where: { username: req.body.emailOrUsername },
+    });
+  }
+  if (!user) {
+    return res.status(404).json({ msg: USER_NOT_EXISTS });
+  }
+
+  try {
+    const emailToken = jwt.sign({ user: user.id }, process.env.EMAIL_SECRET, {
+      expiresIn: '1d',
+    });
+
+    const url = getUserConfirmationUrl(emailToken);
+    const template = fs.readFileSync(
+      path.resolve(__dirname, '../templates/confirmEmail.njk'),
+      'utf-8'
+    );
+    transporter.sendMail({
+      to: user.email,
+      subject: 'Confirm email',
+      html: nunjucks.renderString(template, { url }),
+    });
+
+    return res.status(201).json({ msg: EMAIL_SENT });
+  } catch (err) {
+    return res.status(500).json({ msg: err });
+  }
+});
 
 export default router;
