@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import http from 'http';
 import path from 'path';
+import chalk from 'chalk';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
 import WebSocket from 'ws';
@@ -23,9 +24,9 @@ const app = express();
 (async () => {
   try {
     await sequelize.authenticate();
-    console.log('Connection has been established successfully.');
+    console.log(chalk.green('Connection to DB established successfully!'));
   } catch (error) {
-    console.error('Unable to connect to the database:', error);
+    console.error(chalk.red('Unable to connect to the database:', error));
   }
 })();
 

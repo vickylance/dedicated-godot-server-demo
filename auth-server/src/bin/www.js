@@ -5,6 +5,7 @@
  */
 
 import debugLib from 'debug';
+import chalk from 'chalk';
 import server, { app } from '../app';
 
 const debug = debugLib('your-project-name:server');
@@ -69,7 +70,7 @@ const port = normalizePort(process.env.PORT || '3000');
 app.set('port', port);
 
 server.listen(app.get('port'), () => {
-  console.log(`Server started on port: ${server.address().port}`);
+  console.log(chalk.green(`Server started on port: ${server.address().port}`));
 });
 server.on('error', onError);
 server.on('listening', onListening);

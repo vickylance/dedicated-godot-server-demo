@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import User from '../models/User';
 import verifyToken from '../validations/verifyToken';
+import rateLimiter from '../validations/rateLimiter';
 import {
   generateAccessToken,
   getUserConfirmationUrl,
@@ -102,70 +103,76 @@ const router = express.Router();
  *              schema:
  *                msg: string
  */
-router.post('/register', async (req, res) => {
-  // validate request body
-  const { error } = registerValidation(req.body);
-  if (error) {
-    return res.status(400).json({ msg: error.details[0].message });
-  }
+router.post(
+  '/register',
+  (req, res, next) => rateLimiter(req, res, next, 1, 60 * 5), // can register a new user per ip for 1 time in 5 mins
+  async (req, res) => {
+    // validate request body
+    const { error } = registerValidation(req.body);
+    if (error) {
+      return res.status(400).json({ msg: error.details[0].message });
+    }
 
-  // Check if user already exists
-  const emailExists = await User.findOne({ where: { email: req.body.email } });
-  if (emailExists) {
-    return res.status(400).json({ msg: EMAIL_EXISTS });
-  }
-  const usernameExists = await User.findOne({
-    where: { username: req.body.username },
-  });
-  if (usernameExists) {
-    return res.status(400).json({ msg: USERNAME_EXISTS });
-  }
+    // Check if user already exists
+    const emailExists = await User.findOne({
+      where: { email: req.body.email },
+    });
+    if (emailExists) {
+      return res.status(400).json({ msg: EMAIL_EXISTS });
+    }
+    const usernameExists = await User.findOne({
+      where: { username: req.body.username },
+    });
+    if (usernameExists) {
+      return res.status(400).json({ msg: USERNAME_EXISTS });
+    }
 
-  // hash password
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(req.body.password, salt);
+    // hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
-  // create new user
-  const user = User.build({
-    name: req.body.name,
-    username: req.body.username,
-    email: req.body.email,
-    password: hashedPassword,
-  });
+    // create new user
+    const user = User.build({
+      name: req.body.name,
+      username: req.body.username,
+      email: req.body.email,
+      password: hashedPassword,
+    });
 
-  try {
-    // save user
-    const savedUser = await user.save();
+    try {
+      // save user
+      const savedUser = await user.save();
 
-    // async email
-    jwt.sign(
-      { user: savedUser.id },
-      process.env.EMAIL_SECRET,
-      { expiresIn: '1d' },
-      (err, emailToken) => {
-        if (err) {
-          console.error(err);
-          return;
+      // async email
+      jwt.sign(
+        { user: savedUser.id },
+        process.env.EMAIL_SECRET,
+        { expiresIn: '1d' },
+        (err, emailToken) => {
+          if (err) {
+            console.error(err);
+            return;
+          }
+          const url = getUserConfirmationUrl(emailToken);
+          const template = fs.readFileSync(
+            path.resolve(__dirname, '../templates/confirmEmail.njk'),
+            'utf-8'
+          );
+          transporter.sendMail({
+            to: savedUser.email,
+            subject: 'Confirm email',
+            html: nunjucks.renderString(template, { url }),
+          });
+          console.log('Email sent successfully');
         }
-        const url = getUserConfirmationUrl(emailToken);
-        const template = fs.readFileSync(
-          path.resolve(__dirname, '../templates/confirmEmail.njk'),
-          'utf-8'
-        );
-        transporter.sendMail({
-          to: savedUser.email,
-          subject: 'Confirm email',
-          html: nunjucks.renderString(template, { url }),
-        });
-        console.log('Email sent successfully');
-      }
-    );
+      );
 
-    return res.status(201).json({ msg: USER_CREATED, user: savedUser.id });
-  } catch (err) {
-    return res.status(500).json({ msg: err });
+      return res.status(201).json({ msg: USER_CREATED, user: savedUser.id });
+    } catch (err) {
+      return res.status(500).json({ msg: err });
+    }
   }
-});
+);
 
 /**
  * @swagger
@@ -784,49 +791,51 @@ router.patch('/password/reset/:token', async (req, res) => {
  *              schema:
  *                msg: string
  */
-router.post('/resend-email', async (req, res) => {
-  // TODO: implement rate limiting on this
+router.post(
+  '/resend-email',
+  (req, res, next) => rateLimiter(req, res, next, 1, 60),
+  async (req, res) => {
+    // validate request body
+    const { error } = resendEmailValidation(req.body);
+    if (error) {
+      return res.status(400).json({ msg: error.details[0].message });
+    }
 
-  // validate request body
-  const { error } = resendEmailValidation(req.body);
-  if (error) {
-    return res.status(400).json({ msg: error.details[0].message });
-  }
-
-  // check if valid user
-  let user = false;
-  user = await User.findOne({
-    where: { email: req.body.emailOrUsername },
-  });
-  if (!user) {
+    // check if valid user
+    let user = false;
     user = await User.findOne({
-      where: { username: req.body.emailOrUsername },
+      where: { email: req.body.emailOrUsername },
     });
-  }
-  if (!user) {
-    return res.status(404).json({ msg: USER_NOT_EXISTS });
-  }
+    if (!user) {
+      user = await User.findOne({
+        where: { username: req.body.emailOrUsername },
+      });
+    }
+    if (!user) {
+      return res.status(404).json({ msg: USER_NOT_EXISTS });
+    }
 
-  try {
-    const emailToken = jwt.sign({ user: user.id }, process.env.EMAIL_SECRET, {
-      expiresIn: '1d',
-    });
+    try {
+      const emailToken = jwt.sign({ user: user.id }, process.env.EMAIL_SECRET, {
+        expiresIn: '1d',
+      });
 
-    const url = getUserConfirmationUrl(emailToken);
-    const template = fs.readFileSync(
-      path.resolve(__dirname, '../templates/confirmEmail.njk'),
-      'utf-8'
-    );
-    transporter.sendMail({
-      to: user.email,
-      subject: 'Confirm email',
-      html: nunjucks.renderString(template, { url }),
-    });
+      const url = getUserConfirmationUrl(emailToken);
+      const template = fs.readFileSync(
+        path.resolve(__dirname, '../templates/confirmEmail.njk'),
+        'utf-8'
+      );
+      transporter.sendMail({
+        to: user.email,
+        subject: 'Confirm email',
+        html: nunjucks.renderString(template, { url }),
+      });
 
-    return res.status(201).json({ msg: EMAIL_SENT });
-  } catch (err) {
-    return res.status(500).json({ msg: err });
+      return res.status(201).json({ msg: EMAIL_SENT });
+    } catch (err) {
+      return res.status(500).json({ msg: err });
+    }
   }
-});
+);
 
 export default router;
