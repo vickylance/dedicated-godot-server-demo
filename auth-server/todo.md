@@ -1,24 +1,24 @@
 # Features ToDo List
 
-- logout
-- refresh token and access token
-- role based authorization
-- soft delete account
-- block account from admin
-- change password
-- password max retries
-- forgot password
-- resend confirmation email
-- google auth
-- facebook auth
-- bind multiple auth
-- swagger docs
-- prometheus integration
-- Jaegar integration
-- health check api
-- test coverage
-- check for password and confirm password
-- Don't allow to change the same password for last 5 passwords
-- Rate limiting for all the APIs
-- all catch block should return a custom message and log the error
-- implement QR code based 2 factor auth
+- [x] logout
+- [x] refresh token and access token
+- [ ] role based authorization
+- [ ] soft delete account
+- [ ] block account from admin
+- [x] change password
+- [ ] password max retries
+- [x] forgot password
+- [x] resend confirmation email
+- [ ] google auth
+- [ ] facebook auth
+- [ ] bind multiple auth
+- [x] swagger docs
+- [ ] prometheus integration
+- [ ] Jaegar integration
+- [ ] health check api
+- [ ] test coverage
+- [x] check for password and confirm password
+- [ ] Don't allow to change the same password for last 5 passwords
+- [ ] Rate limiting for all the APIs
+- [ ] all catch block should return a custom message and log the error
+- [ ] implement QR code based 2 factor auth
