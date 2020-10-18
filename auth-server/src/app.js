@@ -13,8 +13,7 @@ import swaggerUi from 'swagger-ui-express';
 import sequelize from './db';
 
 // import routes
-import indexRouter from './routes/index';
-import userRouter from './routes/user';
+import routes from './routes';
 
 dotenv.config();
 
@@ -38,8 +37,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '../public')));
 
 // routers middleware
-app.use('/', indexRouter);
-app.use('/api/v1/user', userRouter);
+app.use('/', routes);
 
 // Swagger set up
 const options = {
@@ -62,13 +60,14 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:3000/api/v1',
+        url: `http://localhost:${process.env.PORT}/api/v1`,
       },
     ],
   },
   apis: [
     path.resolve(__dirname, './models/User.js'),
     path.resolve(__dirname, './routes/user.js'),
+    path.resolve(__dirname, './routes/healthcheck.js'),
   ],
 };
 const specs = swaggerJsdoc(options);

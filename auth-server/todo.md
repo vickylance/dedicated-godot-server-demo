@@ -15,7 +15,7 @@
 - [x] swagger docs
 - [ ] prometheus integration
 - [ ] Jaegar integration
-- [ ] health check api
+- [x] health check api
 - [ ] test coverage
 - [x] check for password and confirm password
 - [ ] Don't allow to change the same password for last 5 passwords
